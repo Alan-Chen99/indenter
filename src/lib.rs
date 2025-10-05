@@ -138,7 +138,7 @@ pub enum Format<'a> {
     /// Custom indenters are passed the current line number and the buffer to be written to as args
     Custom {
         /// The custom indenter
-        inserter: &'a mut Inserter,
+        inserter: &'a mut Inserter<'a>,
     },
 }
 
@@ -162,7 +162,7 @@ pub struct Indented<'a, D: ?Sized> {
 /// A callback for `Format::Custom` used to insert indenation after a new line
 ///
 /// The first argument is the line number within the output, starting from 0
-pub type Inserter = dyn FnMut(usize, &mut dyn fmt::Write) -> fmt::Result;
+pub type Inserter<'a> = dyn FnMut(usize, &mut dyn fmt::Write) -> fmt::Result + 'a;
 
 impl Format<'_> {
     fn insert_indentation(&mut self, line: usize, f: &mut dyn fmt::Write) -> fmt::Result {
