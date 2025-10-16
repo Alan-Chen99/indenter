@@ -156,6 +156,7 @@ pub struct Indented<'a, D: ?Sized> {
     inner: &'a mut D,
     line_number: usize,
     needs_indent: bool,
+    ignore_empty: bool,
     format: Format<'a>,
 }
 
@@ -196,6 +197,27 @@ impl<'a, D> Indented<'a, D> {
         self.format = format;
         self
     }
+
+    /// set whether empty lines should be indented
+    pub fn with_ignore_empty(mut self, ignore_empty: bool) -> Self {
+        self.ignore_empty = ignore_empty;
+        self
+    }
+}
+
+impl<'a, D> Indented<'a, D>
+where
+    D: fmt::Write + ?Sized,
+{
+    fn indent_if_needs(&mut self) -> fmt::Result {
+        if self.needs_indent {
+            self.format
+                .insert_indentation(self.line_number, &mut self.inner)?;
+            self.line_number += 1;
+            self.needs_indent = false;
+        }
+        Ok(())
+    }
 }
 
 impl<T> fmt::Write for Indented<'_, T>
@@ -205,22 +227,20 @@ where
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for (i, line) in s.split('\n').enumerate() {
             if i > 0 {
+                if !self.ignore_empty {
+                    self.indent_if_needs()?;
+                }
+
                 self.inner.write_char('\n')?;
                 self.needs_indent = true;
             }
 
-            if self.needs_indent {
-                // Don't render the line unless it actually has text on it
-                if line.is_empty() {
-                    continue;
-                }
-
-                self.format
-                    .insert_indentation(self.line_number, &mut self.inner)?;
-                self.line_number += 1;
-                self.needs_indent = false;
+            // Don't render the line unless it actually has text on it
+            if line.is_empty() {
+                continue;
             }
 
+            self.indent_if_needs()?;
             self.inner.write_str(line)?;
         }
 
@@ -234,6 +254,7 @@ pub fn indented<D: ?Sized>(f: &mut D) -> Indented<'_, D> {
         inner: f,
         line_number: 0,
         needs_indent: true,
+        ignore_empty: true,
         format: Format::Uniform {
             indentation: "    ",
         },
